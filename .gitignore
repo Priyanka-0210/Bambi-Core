@@ -1,0 +1,32 @@
+# Local Environment Variables & Secrets (CRITICAL)
+.env
+*.env
+
+# Python Virtual Environments
+backend/bambienv/
+venv/
+.venv/
+env/
+ENV/
+
+# Python caching and compiled files
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Databases (Keep your local sqlite records clean and local)
+backend/bambi_local.db
+
+# Node/Frontend local dependencies and builds
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+*.local
+
+# System/IDE Specific Files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
