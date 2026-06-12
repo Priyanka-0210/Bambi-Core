@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Bambi Memory Link",
+  "version": "1.0",
+  "description": "Send highlighted web fragments straight into Bambi's digital brain.",
+  "permissions": [
+    "contextMenus",
+    "activeTab"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
