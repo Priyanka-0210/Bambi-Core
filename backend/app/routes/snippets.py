@@ -80,3 +80,59 @@ async def search_snippets(request: SearchRequest):
         return {"status": "success", "results": formatted_results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+# Add this endpoint at the very end of backend/app/routes/snippets.py
+
+@router.get("/recent")
+async def get_recent_snippets():
+    try:
+        import sqlite3
+        from app.database import DB_PATH
+        
+        conn = sqlite3.connect(DB_PATH)
+        # Convert rows automatically into dictionary key-value items
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # Pull records ordered strictly by most recently logged timestamp
+        cursor.execute("SELECT id, content, category, created_at FROM snippets ORDER BY created_at DESC LIMIT 50")
+        rows = cursor.fetchall()
+        conn.close()
+        
+        results = []
+        for row in rows:
+            results.append({
+                "id": row["id"],
+                "content": row["content"],
+                "category": row["category"],
+                "created_at": row["created_at"]
+            })
+            
+        return {"status": "success", "results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+# Append this directly to the bottom of backend/app/routes/snippets.py
+
+@router.delete("/{snippet_id}")
+async def delete_snippet(snippet_id: int):
+    try:
+        import sqlite3
+        from app.database import DB_PATH
+        
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
+        # Verify existence
+        cursor.execute("SELECT id FROM snippets WHERE id = ?", (snippet_id,))
+        if not cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=404, detail="Snippet node not found.")
+            
+        cursor.execute("DELETE FROM snippets WHERE id = ?", (snippet_id,))
+        conn.commit()
+        conn.close()
+        
+        return {"status": "success", "message": f"Node {snippet_id} dropped."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

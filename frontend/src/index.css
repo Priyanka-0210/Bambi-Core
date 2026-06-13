@@ -5,17 +5,76 @@
 @source "./**/*.{js,ts,jsx,tsx}";
 
 @theme {
-  --color-bambi-rose: #c37973;
-  --color-bambi-sand: #c7b0a3;
-  --color-bambi-terracotta: #b66245;
-  --color-bambi-ochre: #aa4c3a;
-  --color-bambi-dark: #201a18; /* A warm charcoal to match the palette aesthetic */
+  --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-serif: 'Playfair Display', serif;
+  --font-mono: 'JetBrains Mono', monospace;
 }
 
 body {
   margin: 0;
   padding: 0;
-  background-color: #fcfaf9; /* A soft tinted off-white background */
-  font-family: 'Inter', system-ui, sans-serif;
+  background-color: #050507;
+  font-family: var(--font-sans);
+  color: #ffffff;
   overflow: hidden;
+}
+
+/* Premium background smoky fluid movement simulation */
+.smoke-canvas {
+  position: relative;
+  background: #050507;
+  overflow: hidden;
+}
+
+.smoke-canvas::before,
+.smoke-canvas::after {
+  content: "";
+  position: absolute;
+  width: 800px;
+  height: 800px;
+  border-radius: 45%;
+  background: radial-gradient(circle, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0) 70%);
+  animation: wave-float 25s infinite linear;
+  pointer-events: none;
+}
+
+.smoke-canvas::before {
+  top: -20%;
+  left: -10%;
+  transform-origin: 50% 48%;
+}
+
+.smoke-canvas::after {
+  bottom: -20%;
+  right: -10%;
+  animation-duration: 35s;
+  animation-direction: reverse;
+  background: radial-gradient(circle, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0) 60%);
+}
+
+@keyframes wave-float {
+  0% { transform: rotate(0deg) translate(0, 0) scale(1); }
+  50% { transform: rotate(180deg) translate(80px, 50px) scale(1.2); }
+  100% { transform: rotate(360deg) translate(0, 0) scale(1); }
+}
+
+/* Glassmorphism panel cards matching the reference */
+.glass-container {
+  background: rgba(10, 10, 12, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.glow-btn {
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.glow-btn:hover {
+  background: #f4f4f5;
+  box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
 }
