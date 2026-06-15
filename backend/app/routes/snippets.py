@@ -1,13 +1,23 @@
 # backend/app/routes/snippets.py
 import uuid
+import datetime
 import traceback
-from fastapi import APIRouter, HTTPException
+import sqlite3
+import os
+import base64
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from app.services.gemini_service import GeminiService
 from app.services.vector_service import VectorService
-from app.database import save_local_snippet
+from app.database import save_local_snippet, DB_PATH
+from google.genai import types
 
 router = APIRouter(prefix="/snippets", tags=["snippets"])
+
+# Define persistent local assets directory relative to project structural architecture
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+STICKER_DIR = os.path.join(BASE_DIR, "static", "stickers")
+os.makedirs(STICKER_DIR, exist_ok=True)
 
 print("Initializing Bambi Core Services...")
 try:
@@ -71,33 +81,36 @@ async def search_snippets(request: SearchRequest):
         
         formatted_results = []
         for match in search_results.get("matches", []):
+            match_metadata = match.get("metadata", {})
             formatted_results.append({
                 "score": match.get("score"),
-                "content": match.get("metadata", {}).get("content"),
-                "category": match.get("metadata", {}).get("category")
+                "content": match_metadata.get("content"),
+                "category": match_metadata.get("category"),
+                "image_url": match_metadata.get("image_url") 
             })
             
         return {"status": "success", "results": formatted_results}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
-# Add this endpoint at the very end of backend/app/routes/snippets.py
 
 @router.get("/recent")
 async def get_recent_snippets():
+    conn = None
     try:
-        import sqlite3
-        from app.database import DB_PATH
-        
         conn = sqlite3.connect(DB_PATH)
-        # Convert rows automatically into dictionary key-value items
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        # Pull records ordered strictly by most recently logged timestamp
-        cursor.execute("SELECT id, content, category, created_at FROM snippets ORDER BY created_at DESC LIMIT 50")
+        # Verify the database schema explicitly has our new column to prevent statement runtime errors
+        cursor.execute("PRAGMA table_info(snippets)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        if "image_url" not in columns:
+            cursor.execute("ALTER TABLE snippets ADD COLUMN image_url TEXT")
+            conn.commit()
+
+        cursor.execute("SELECT id, content, category, created_at, image_url FROM snippets ORDER BY created_at DESC LIMIT 50")
         rows = cursor.fetchall()
-        conn.close()
         
         results = []
         for row in rows:
@@ -105,25 +118,117 @@ async def get_recent_snippets():
                 "id": row["id"],
                 "content": row["content"],
                 "category": row["category"],
-                "created_at": row["created_at"]
+                "created_at": row["created_at"],
+                "image_url": row["image_url"]
             })
             
         return {"status": "success", "results": results}
     except Exception as e:
+        print(f"Error encountered in /recent mapping: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-    
-# Append this directly to the bottom of backend/app/routes/snippets.py
+    finally:
+        if conn:
+            conn.close()
 
-@router.delete("/{snippet_id}")
-async def delete_snippet(snippet_id: int):
+# MULTIMODAL CROP STICKER PROCESSING ENGINE
+@router.post("/upload-sticker")
+async def upload_sticker(file: UploadFile = File(...)):
     try:
-        import sqlite3
-        from app.database import DB_PATH
+        image_bytes = await file.read()
+        
+        print("\n--- Processing Visual Screenshot Sticker ---")
+        print("1. Routing image framing payload to Gemini Vision...")
+        
+        # Safe universal Base64 serialization handling to prevent type casting drop collisions
+        base64_image = base64.b64encode(image_bytes).decode("utf-8")
+        
+        analysis_prompt = """
+        You are Bambi's visual intelligence core. Analyze this screenshot sticker.
+        1. If it contains machine learning code or math formulas, write down the clean Markdown/LaTeX representation.
+        2. If it is an image, code block, or text document, summarize its core technical meaning or descriptions.
+        3. Assign exactly one short category identifier label (like AI, Code, Math, Disney, Design).
+        
+        Provide your output in this format:
+        CATEGORY: <Single-Word-Category>
+        DESCRIPTION: <Extracted text or semantic summary of the screenshot contents>
+        """
+        
+        response = gemini.client.models.generate_content(
+            model=gemini.text_model,
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type=file.content_type),
+                analysis_prompt
+            ]
+        )
+        
+        raw_output = response.text
+        category = "Visual"
+        content_summary = raw_output
+        
+        for line in raw_output.split("\n"):
+            if line.startswith("CATEGORY:"):
+                category = line.replace("CATEGORY:", "").strip()
+            elif line.startswith("DESCRIPTION:"):
+                content_summary = line.replace("DESCRIPTION:", "").strip()
+
+        # FIXED: STICKER_DIR is now globally established and tracked at the top of the file
+        filename = f"{uuid.uuid4()}.png"
+        file_path = os.path.join(STICKER_DIR, filename)
+        with open(file_path, "wb") as f:
+            f.write(image_bytes)
+        
+        image_url = f"http://127.0.0.1:8000/static/stickers/{filename}"
+        formatted_content = f"[Visual Sticker] {content_summary}"
+
+        print("2. Vectorizing image context text description tracks...")
+        embedding = gemini.get_text_embedding(formatted_content)
+        
+        print("3. Syncing visual tracking matrix parameters to Pinecone...")
+        snippet_id = str(uuid.uuid4())
+        
+        metadata = {
+            "content": formatted_content, 
+            "category": category,
+            "image_url": image_url
+        }
+        vector_db.store_snippet_vector(snippet_id, embedding, metadata)
+
+        print("4. Logging permanent trace node inside SQLite Database...")
+        created_at = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         conn = sqlite3.connect(DB_PATH)
         cursor = conn.cursor()
         
-        # Verify existence
+        try:
+            cursor.execute("ALTER TABLE snippets ADD COLUMN image_url TEXT")
+        except sqlite3.OperationalError:
+            pass # Structural parameter is already active
+
+        cursor.execute(
+            "INSERT INTO snippets (id, content, category, created_at, image_url) VALUES (?, ?, ?, ?, ?)",
+            (snippet_id, formatted_content, category, created_at, image_url)
+        )
+        conn.commit()
+        conn.close()
+        
+        print("Visual sticker storage tracking verified.")
+        return {
+            "status": "success",
+            "category": category,
+            "image_url": image_url,
+            "message": "Visual screenshot sticker analyzed and indexed successfully!"
+        }
+    except Exception as e:
+        print("\n=== STICKER PIPELINE PROCESSING CRASH ===")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{snippet_id}")
+async def delete_snippet(snippet_id: str):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        cursor = conn.cursor()
+        
         cursor.execute("SELECT id FROM snippets WHERE id = ?", (snippet_id,))
         if not cursor.fetchone():
             conn.close()
