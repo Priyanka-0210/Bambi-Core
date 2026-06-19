@@ -241,3 +241,53 @@ async def delete_snippet(snippet_id: str):
         return {"status": "success", "message": f"Node {snippet_id} dropped."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class ChatAssistantRequest(BaseModel):
+    message: str
+    history: list = [] # To track the chat history if needed later
+
+@router.post("/assistant-chat")
+async def assistant_chat(request: ChatAssistantRequest):
+    try:
+        user_message = request.message
+        print(f"\n--- Bambi Assistant Interaction: '{user_message}' ---")
+        
+        # 1. Look up any relevant memory nodes inside Pinecone matching the user's intent
+        query_vector = gemini.get_text_embedding(user_message)
+        search_results = vector_db.query_similar_snippets(query_vector, top_k=3)
+        
+        context_chunks = []
+        for match in search_results.get("matches", []):
+            context_chunks.append(match.get("metadata", {}).get("content"))
+            
+        context_str = "\n".join(context_chunks) if context_chunks else "No specific matching saved records found."
+        print(f"   Context fragments retrieved: {len(context_chunks)} entries mapped.")
+
+        # 2. Frame the specialized Assistant system persona for Gemini
+        system_prompt = f"""
+        You are Bambi, an authentic, highly advanced AI personal knowledge partner with a touch of wit. 
+        You are talking directly to your creator. Be engaging, clear, and concise. Avoid robotic platitudes.
+        
+        Here is the relevant context retrieved from your personal Vault memory logs regarding their query:
+        {context_str}
+        
+        Answer the user's question naturally using this context if applicable. If the context isn't relevant, reply using your general intelligence but maintain your personality.
+        Keep your response brief (2-3 sentences max) so it sounds natural when spoken out loud.
+        """
+
+        response = gemini.client.models.generate_content(
+            model=gemini.text_model,
+            contents=[system_prompt, user_message]
+        )
+        
+        ai_reply = response.text.strip()
+        print(f"   Bambi Assistant Response: '{ai_reply}'")
+        
+        return {
+            "status": "success",
+            "reply": ai_reply,
+            "has_context": len(context_chunks) > 0
+        }
+    except Exception as e:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

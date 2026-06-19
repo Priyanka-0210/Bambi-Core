@@ -69,19 +69,63 @@ function App() {
     else { setSearchResults([]); recognitionRef.current.start(); }
   };
 
+  // NATIVE TEXT-TO-SPEECH VOICE AUDIO SYNTHESIS DRIVER
+  const speakOutLoud = (text) => {
+    if (!window.speechSynthesis) return;
+    
+    // Terminate any ongoing audio playback sequences right away
+    window.speechSynthesis.cancel();
+    
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'en-US';
+    utterance.rate = 1.05; // Balanced fast pacing for organic delivery
+    utterance.pitch = 1.0;
+    
+    const voices = window.speechSynthesis.getVoices();
+    // Attempt parsing natural premium sounding engine alternatives if present inside client browser
+    const premiumVoice = voices.find(v => v.name.includes('Google') || v.name.includes('Natural'));
+    if (premiumVoice) utterance.voice = premiumVoice;
+
+    utterance.onstart = () => setBambiStatus('Speaking');
+    utterance.onend = () => setBambiStatus('Active');
+    
+    window.speechSynthesis.speak(utterance);
+  };
+
+  // UPGRADED CONVERSATIONAL ASSISTANT SEARCH & RESPONSE COGNITION GATE
   const executeSearchPipeline = async (queryText) => {
     const targetQuery = queryText || searchQuery;
     if (!targetQuery.trim()) return;
+
     setBambiStatus('Thinking');
+    setBambiThinking(`Processing query inputs down your assistant's neural context paths...`);
+    
     try {
-      const response = await axios.post('http://127.0.0.1:8000/snippets/search', { query: targetQuery });
+      // 1. Send input payload down to the assistant brain route
+      const response = await axios.post('http://127.0.0.1:8000/snippets/assistant-chat', { 
+        message: targetQuery 
+      });
+      
       if (response.data.status === 'success') {
-        setSearchResults(response.data.results);
-        setBambiStatus('Active');
-        setBambiThinking(response.data.results.length === 0 ? `0 matches found for "${targetQuery}".` : `Extracted matches.`);
+        const replyText = response.data.reply;
+        
+        setBambiStatus('Speaking');
+        setBambiThinking(replyText);
+        setSearchQuery(''); // Flush input placeholder ready for sequential entries
+        
+        // 2. Trigger voice synthesizer track out loud
+        speakOutLoud(replyText);
+        
+        // 3. Request background vector matches to serve up context cards inline
+        const searchRes = await axios.post('http://127.0.0.1:8000/snippets/search', { query: targetQuery });
+        if (searchRes.data.status === 'success') {
+          setSearchResults(searchRes.data.results);
+        }
       }
     } catch (error) {
+      console.error(error);
       setBambiStatus('Error');
+      setBambiThinking('An extraction boundary delay occurred inside my conversational links.');
     }
   };
 
@@ -285,8 +329,12 @@ function App() {
       {/* 1. HEADER BAR COMPONENT */}
       <div className="w-full flex justify-between items-center z-10">
         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10">
-          <span className={`w-1.5 h-1.5 rounded-full ${bambiStatus === 'Thinking' ? 'bg-neutral-400 animate-ping' : bambiStatus === 'Listening' ? 'bg-rose-500 animate-pulse' : 'bg-neutral-200'}`}></span>
-          <span className="font-mono text-[9px] uppercase tracking-wider text-neutral-400">Bambi Core v1.5</span>
+          <span className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+            bambiStatus === 'Thinking' ? 'bg-amber-400 animate-ping' : 
+            bambiStatus === 'Listening' ? 'bg-rose-500 animate-pulse' : 
+            bambiStatus === 'Speaking' ? 'bg-emerald-400 animate-pulse scale-110' : 'bg-neutral-200'
+          }`}></span>
+          <span className="font-mono text-[9px] uppercase tracking-wider text-neutral-400">Bambi Assistant v1.5</span>
         </div>
         
         <div className="flex gap-3">
@@ -311,7 +359,7 @@ function App() {
           <h1 className="text-5xl font-light tracking-tight text-white font-sans mb-3">
             Bambi <span className="font-serif italic text-neutral-400">Vault</span>
           </h1>
-          <p className="font-serif italic text-sm text-neutral-400 max-w-lg mx-auto leading-relaxed min-h-[48px] transition-all duration-300">
+          <p className="font-serif italic text-sm text-neutral-300 max-w-lg mx-auto leading-relaxed min-h-[48px] transition-all duration-300">
             {bambiThinking}
           </p>
         </div>
@@ -331,7 +379,7 @@ function App() {
               onClick={() => executeSearchPipeline()}
               className="absolute right-3 bg-white text-black hover:bg-neutral-200 text-xs font-semibold px-4 py-2.5 rounded-xl active:scale-95 transition-transform"
             >
-              Search
+              Ask
             </button>
           </div>
 
@@ -359,10 +407,10 @@ function App() {
           </div>
         )}
 
-        {/* Semantic Query Results Display list box */}
+        {/* Semantic Query Results Context Dropdown list box */}
         {searchResults.length > 0 && (
-          <div className="w-full space-y-4 max-h-96 overflow-y-auto pr-2 animate-fade-in">
-            <h3 className="font-mono text-[9px] tracking-widest text-neutral-500 uppercase px-1">Relevant Context Discovered</h3>
+          <div className="w-full space-y-4 max-h-64 overflow-y-auto pr-2 animate-fade-in border-t border-white/5 pt-4 mt-2">
+            <h3 className="font-mono text-[9px] tracking-widest text-neutral-500 uppercase px-1">Retrieved Ground Context Logs</h3>
             {searchResults.map((res, index) => (
               <div key={index} className="p-4 bg-white/[0.01] border border-white/5 rounded-xl flex flex-col gap-3 hover:border-white/10 transition-colors">
                 <div className="flex justify-between items-center">
@@ -371,7 +419,6 @@ function App() {
                 </div>
                 <p className="text-neutral-300 text-xs font-serif italic leading-relaxed">"{res.content}"</p>
                 
-                {/* INLINE RETRIEVED IMAGE DISPLAY */}
                 {res.image_url && (
                   <div className="mt-1 rounded-xl overflow-hidden border border-white/10 bg-black/40 max-h-64 flex items-center justify-start p-1 w-full">
                     <img 
@@ -424,7 +471,6 @@ function App() {
                       </div>
                       <p className="text-neutral-300 text-xs font-serif leading-relaxed italic border-l border-white/10 pl-3">"{snip.content}"</p>
                       
-                      {/* HISTORICAL LEDGER IMAGE RENDERING */}
                       {snip.image_url && (
                         <div className="mt-1 rounded-xl overflow-hidden border border-white/5 bg-black/20 max-h-40 flex items-center justify-center w-full p-0.5">
                           <img 
