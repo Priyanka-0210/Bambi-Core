@@ -1,6 +1,22 @@
 // frontend/src/App.jsx
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import axios from 'axios';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, useGLTF } from '@react-three/drei';
+
+// Helper Component to safely load and isolate the GLTF/GLB binary file data
+function VaultModel() {
+  const { scene } = useGLTF('/teddy_bear.glb');
+  
+  return (
+    <primitive 
+      object={scene} 
+      // Centered cleanly on the viewport stage coordinates
+      position={[0, -0.2, 0]} 
+      scale={[1.5, 1.5, 1.5]} 
+    />
+  );
+}
 
 function App() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,17 +88,14 @@ function App() {
   // NATIVE TEXT-TO-SPEECH VOICE AUDIO SYNTHESIS DRIVER
   const speakOutLoud = (text) => {
     if (!window.speechSynthesis) return;
-    
-    // Terminate any ongoing audio playback sequences right away
     window.speechSynthesis.cancel();
     
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
-    utterance.rate = 1.05; // Balanced fast pacing for organic delivery
+    utterance.rate = 1.05;
     utterance.pitch = 1.0;
     
     const voices = window.speechSynthesis.getVoices();
-    // Attempt parsing natural premium sounding engine alternatives if present inside client browser
     const premiumVoice = voices.find(v => v.name.includes('Google') || v.name.includes('Natural'));
     if (premiumVoice) utterance.voice = premiumVoice;
 
@@ -92,7 +105,7 @@ function App() {
     window.speechSynthesis.speak(utterance);
   };
 
-  // UPGRADED CONVERSATIONAL ASSISTANT SEARCH & RESPONSE COGNITION GATE
+  // ASSISTANT SEARCH & RESPONSE COGNITION GATE
   const executeSearchPipeline = async (queryText) => {
     const targetQuery = queryText || searchQuery;
     if (!targetQuery.trim()) return;
@@ -101,7 +114,6 @@ function App() {
     setBambiThinking(`Processing query inputs down your assistant's neural context paths...`);
     
     try {
-      // 1. Send input payload down to the assistant brain route
       const response = await axios.post('http://127.0.0.1:8000/snippets/assistant-chat', { 
         message: targetQuery 
       });
@@ -111,11 +123,11 @@ function App() {
         
         setBambiStatus('Speaking');
         setBambiThinking(replyText);
-        setSearchQuery(''); // Flush input placeholder ready for sequential entries
+        setSearchQuery('');
         
-        // 2. Trigger voice synthesizer track out loud
         speakOutLoud(replyText);
         
+        // FIXED: Replaced Python comment tag (#) with valid JavaScript comment tags (//)
         // 3. Request background vector matches to serve up context cards inline
         const searchRes = await axios.post('http://127.0.0.1:8000/snippets/search', { query: targetQuery });
         if (searchRes.data.status === 'success') {
@@ -129,7 +141,7 @@ function App() {
     }
   };
 
-  // NATIVE CAPTURE TOOL: Renders any screen view into a cropping frame
+  // NATIVE CAPTURE TOOL
   const startAreaSelection = async () => {
     setCroppedImage(null);
     setBambiStatus('Thinking');
@@ -157,7 +169,6 @@ function App() {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
           
           fullPageSnapshot.current = canvas;
-          
           stream.getTracks().forEach(track => track.stop());
 
           setIsSelectingArea(true);
@@ -308,9 +319,9 @@ function App() {
   const filteredSnippets = selectedCategory === 'All' ? recentSnippets : recentSnippets.filter(s => s.category === selectedCategory);
 
   return (
-    <div className="smoke-canvas w-screen h-screen flex flex-col justify-between p-6 overflow-hidden relative select-none">
+    <div className="w-screen h-screen bg-[#050507] flex flex-col justify-between p-6 overflow-hidden relative select-none">
       
-      {/* FULLSCREEN MOUSE-CAPTURE WORKSPACE SCREEN OVERLAY CONTAINER */}
+      {/* FULLSCREEN MOUSE-CAPTURE OVERLAY */}
       {isSelectingArea && (
         <div className="fixed inset-0 z-[99999] bg-black">
           <canvas 
@@ -320,14 +331,11 @@ function App() {
             onMouseMove={onCropMouseMove}
             onMouseUp={onCropMouseUp}
           />
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-neutral-900/90 backdrop-blur text-white font-mono text-[10px] px-5 py-2.5 rounded-full tracking-wider uppercase border border-white/10 pointer-events-none shadow-2xl">
-            ⚡ Click and drag a box across the static frame view to crop your sticker
-          </div>
         </div>
       )}
 
-      {/* 1. HEADER BAR COMPONENT */}
-      <div className="w-full flex justify-between items-center z-10">
+      {/* 1. TOP HEADER NAVIGATION ROW */}
+      <div className="w-full flex justify-between items-center z-20">
         <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10">
           <span className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
             bambiStatus === 'Thinking' ? 'bg-amber-400 animate-ping' : 
@@ -353,94 +361,135 @@ function App() {
         </div>
       </div>
 
-      {/* 2. CORE CENTRAL SEARCH HUB DISPLAY */}
-      <div className="max-w-2xl w-full mx-auto flex flex-col items-center justify-center flex-1 z-10 -mt-8">
-        <div className="text-center mb-8">
-          <h1 className="text-5xl font-light tracking-tight text-white font-sans mb-3">
-            Bambi <span className="font-serif italic text-neutral-400">Vault</span>
-          </h1>
-          <p className="font-serif italic text-sm text-neutral-300 max-w-lg mx-auto leading-relaxed min-h-[48px] transition-all duration-300">
-            {bambiThinking}
-          </p>
+      {/* 2. SPLIT VIEWPORT CONTAINER PANEL */}
+      <div className="w-full flex flex-1 items-center justify-between gap-12 max-w-7xl mx-auto z-10 overflow-hidden">
+        
+        {/* LEFT COLUMN: NATIVE 3D WEBGL CONTAINER PANEL */}
+        <div className="w-1/2 h-[88vh] flex items-center justify-center relative bg-transparent overflow-hidden">
+          <Canvas camera={{ position: [0, 1.2, 5.0], fov: 45 }}>
+            {/* UPGRADED STUDIO LIGHTING GRID RIG */}
+            {/* Ambient fills dark occlusion cracks evenly */}
+            <ambientLight intensity={1.2} />
+            
+            {/* Main Key light illuminates true surface texture maps */}
+            <directionalLight position={[10, 15, 10]} intensity={3.5} castShadow />
+            
+            {/* Fill light softens harsh vector shadows from the opposing side */}
+            <directionalLight position={[-10, 10, 5]} intensity={1.5} />
+            
+            {/* Rim light pulls true contrast color contours off the pitch black background */}
+            <directionalLight position={[0, 5, -10]} intensity={2.5} />
+            
+            {/* Direct spot highlight beams targeted straight at the model core */}
+            <pointLight position={[0, 4, 2]} intensity={2.0} />
+            
+            <Suspense fallback={null}>
+              <VaultModel />
+            </Suspense>
+            
+            <OrbitControls 
+              enableZoom={true} 
+              enablePan={false}
+              minDistance={2}
+              maxDistance={10}
+              makeDefault
+            />
+          </Canvas>
+          <div className="absolute bottom-4 left-4 font-mono text-[8px] text-neutral-500 uppercase tracking-widest pointer-events-none">
+            🖱 Click & Drag to inspect model
+          </div>
         </div>
 
-        {/* Search Input Layer */}
-        <div className="w-full relative flex items-center mb-6 gap-3">
-          <div className="relative flex-1 flex items-center">
-            <input 
-              type="text" 
-              placeholder="Ask Bambi or select microphone to dictate query..."
-              className="w-full bg-white/[0.01] border border-white/10 text-white placeholder-neutral-700 px-6 py-5 pr-16 text-sm rounded-2xl focus:outline-none focus:border-white/20 focus:bg-white/[0.03] transition-all font-sans shadow-2xl"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && executeSearchPipeline()}
-            />
-            <button 
-              onClick={() => executeSearchPipeline()}
-              className="absolute right-3 bg-white text-black hover:bg-neutral-200 text-xs font-semibold px-4 py-2.5 rounded-xl active:scale-95 transition-transform"
+        {/* RIGHT COLUMN: CORE ASSISTANT CONSOLE HUB */}
+        <div className="w-1/2 flex flex-col items-center justify-center pr-4">
+          <div className="text-center mb-8 w-full">
+            <h1 className="text-5xl font-light tracking-tight text-white font-sans mb-3">
+              Bambi <span className="font-serif italic text-neutral-400">Vault</span>
+            </h1>
+            <p className="font-serif italic text-sm text-neutral-300 max-w-md mx-auto leading-relaxed min-h-[48px] transition-all duration-300">
+              {bambiThinking}
+            </p>
+          </div>
+
+          {/* Search/Query Interaction Row */}
+          <div className="w-full relative flex items-center mb-6 gap-3 max-w-md">
+            <div className="relative flex-1 flex items-center">
+              <input 
+                type="text" 
+                placeholder="Ask Bambi or select microphone to dictate query..."
+                className="w-full bg-white/[0.01] border border-white/10 text-white placeholder-neutral-700 px-6 py-5 pr-16 text-sm rounded-2xl focus:outline-none focus:border-white/25 focus:bg-white/[0.02] transition-all font-sans shadow-2xl"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && executeSearchPipeline()}
+              />
+              <button 
+                onClick={() => executeSearchPipeline()}
+                className="absolute right-3 bg-white text-black hover:bg-neutral-200 text-xs font-semibold px-4 py-2.5 rounded-xl active:scale-95 transition-transform"
+              >
+                Ask
+              </button>
+            </div>
+
+            <button
+              onClick={toggleListening}
+              className={`p-4.5 rounded-2xl border transition-all flex items-center justify-center active:scale-95 ${
+                isListening ? 'bg-rose-500 border-rose-400 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-pulse' : 'bg-white/5 border-white/10 text-neutral-400 hover:text-white'
+              }`}
             >
-              Ask
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 0 3-3v-6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" /></svg>
             </button>
           </div>
 
-          <button
-            onClick={toggleListening}
-            className={`p-4.5 rounded-2xl border transition-all flex items-center justify-center active:scale-95 ${
-              isListening ? 'bg-rose-500 border-rose-400 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-pulse' : 'bg-white/5 border-white/10 text-neutral-400 hover:text-white'
-            }`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 0 3-3v-6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" /></svg>
-          </button>
+          {/* CROPPED STICKER PREVIEW WINDOW */}
+          {croppedImage && (
+            <div className="w-full max-w-xs bg-[#121216]/90 border border-white/10 p-4 rounded-2xl flex flex-col gap-3 shadow-2xl mb-6 animate-fade-in backdrop-blur-md">
+              <span className="font-mono text-[8px] text-neutral-500 uppercase tracking-widest">Isolated Region Sticker Clip Preview</span>
+              <div className="rounded-lg overflow-hidden border border-white/5 bg-black max-h-40 flex items-center justify-center">
+                <img src={croppedImage} alt="Crop Snippet" className="object-contain max-h-40 w-full" />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setCroppedImage(null)} className="flex-1 bg-white/5 hover:bg-white/10 text-white text-xs py-2 rounded-xl transition-all">Cancel</button>
+                <button onClick={sendStickerToBambi} className="flex-1 bg-white text-black font-semibold text-xs py-2 rounded-xl transition-all hover:bg-neutral-200">Send to Bambi</button>
+              </div>
+            </div>
+          )}
+
+          {/* Semantic Matching Result Cards Dropdown */}
+          {searchResults.length > 0 && (
+            <div className="w-full max-w-md space-y-4 max-h-[35vh] overflow-y-auto pr-2 animate-fade-in border-t border-white/5 pt-4 mt-2">
+              <h3 className="font-mono text-[9px] tracking-widest text-neutral-500 uppercase px-1">Retrieved Ground Context Logs</h3>
+              {searchResults.map((res, index) => (
+                <div key={index} className="p-4 bg-white/[0.01] border border-white/5 rounded-xl flex flex-col gap-3 hover:border-white/10 transition-colors">
+                  <div className="flex justify-between items-center">
+                    <span className="font-mono text-[8px] tracking-widest text-neutral-400 uppercase bg-white/5 px-2 py-0.5 rounded border border-white/5">{res.category}</span>
+                    <span className="font-mono text-[9px] text-neutral-500">{(res.score * 100).toFixed(0)}% Match</span>
+                  </div>
+                  <p className="text-neutral-300 text-xs font-serif italic leading-relaxed">"{res.content}"</p>
+                  
+                  {res.image_url && (
+                    <div className="mt-1 rounded-xl overflow-hidden border border-white/10 bg-black/40 max-h-64 flex items-center justify-start p-1 w-full">
+                      <img 
+                        src={res.image_url} 
+                        alt="Retrieved Sticker Asset" 
+                        className="object-contain max-h-60 rounded-lg max-w-full"
+                        onError={(e) => { e.target.style.display = 'none'; }}
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* CROP SNIPPET PREVIEW COMPONENT CARD */}
-        {croppedImage && (
-          <div className="w-full max-w-sm bg-[#121216]/90 border border-white/10 p-4 rounded-2xl flex flex-col gap-3 shadow-2xl mb-6 animate-fade-in backdrop-blur-md">
-            <span className="font-mono text-[8px] text-neutral-500 uppercase tracking-widest">Isolated Region Sticker Clip Preview</span>
-            <div className="rounded-lg overflow-hidden border border-white/5 bg-black max-h-40 flex items-center justify-center">
-              <img src={croppedImage} alt="Crop Snippet" className="object-contain max-h-40 w-full" />
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setCroppedImage(null)} className="flex-1 bg-white/5 hover:bg-white/10 text-white text-xs py-2 rounded-xl transition-all">Cancel</button>
-              <button onClick={sendStickerToBambi} className="flex-1 bg-white text-black font-semibold text-xs py-2 rounded-xl transition-all hover:bg-neutral-200">Send to Bambi</button>
-            </div>
-          </div>
-        )}
-
-        {/* Semantic Query Results Context Dropdown list box */}
-        {searchResults.length > 0 && (
-          <div className="w-full space-y-4 max-h-64 overflow-y-auto pr-2 animate-fade-in border-t border-white/5 pt-4 mt-2">
-            <h3 className="font-mono text-[9px] tracking-widest text-neutral-500 uppercase px-1">Retrieved Ground Context Logs</h3>
-            {searchResults.map((res, index) => (
-              <div key={index} className="p-4 bg-white/[0.01] border border-white/5 rounded-xl flex flex-col gap-3 hover:border-white/10 transition-colors">
-                <div className="flex justify-between items-center">
-                  <span className="font-mono text-[8px] tracking-widest text-neutral-400 uppercase bg-white/5 px-2 py-0.5 rounded border border-white/5">{res.category}</span>
-                  <span className="font-mono text-[9px] text-neutral-500">{(res.score * 100).toFixed(0)}% Match</span>
-                </div>
-                <p className="text-neutral-300 text-xs font-serif italic leading-relaxed">"{res.content}"</p>
-                
-                {res.image_url && (
-                  <div className="mt-1 rounded-xl overflow-hidden border border-white/10 bg-black/40 max-h-64 flex items-center justify-start p-1 w-full">
-                    <img 
-                      src={res.image_url} 
-                      alt="Retrieved Sticker Asset" 
-                      className="object-contain max-h-60 rounded-lg max-w-full"
-                      onError={(e) => { e.target.style.display = 'none'; }}
-                    />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* FOOTER BAR TRACK */}
-      <div className="w-full text-center z-10 opacity-30">
+      {/* 3. FOOTER NETWORKING MARQUEE TRACK */}
+      <div className="w-full text-center z-20 opacity-20 mt-4">
         <p className="font-mono text-[9px] tracking-widest text-neutral-600 uppercase">AI Vector Matrix Interaction Network Layer</p>
       </div>
 
-      {/* 3. FULLSCREEN LEDGER MODAL ARCHIVE RECOVERY VIEW */}
+      {/* FULLSCREEN LEDGER MODAL VIEW */}
       {isLedgerOpen && (
         <div className="absolute inset-0 bg-[#060608] z-50 flex flex-col p-8 overflow-hidden animate-fade-in">
           <div className="w-full max-w-7xl mx-auto flex justify-between items-center border-b border-white/5 pb-6 mb-8">
