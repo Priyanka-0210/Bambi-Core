@@ -1,19 +1,17 @@
-// frontend/src/App.jsx
 import React, { useState, useEffect, useRef, Suspense } from 'react';
 import axios from 'axios';
 import { Canvas } from '@react-three/fiber';
-import { OrbitControls, useGLTF } from '@react-three/drei';
+import { OrbitControls, useGLTF, Html } from '@react-three/drei';
 
 // Helper Component to safely load and isolate the GLTF/GLB binary file data
 function VaultModel() {
-  const { scene } = useGLTF('/teddy_bear.glb');
+  const { scene } = useGLTF('cute_spooky_cat.glb');
   
   return (
     <primitive 
       object={scene} 
-      // Centered cleanly on the viewport stage coordinates
-      position={[0, -0.2, 0]} 
-      scale={[1.5, 1.5, 1.5]} 
+      position={[0, 0, 0]} 
+      scale={[1.8, 1.8, 1.8]} 
     />
   );
 }
@@ -127,8 +125,6 @@ function App() {
         
         speakOutLoud(replyText);
         
-        // FIXED: Replaced Python comment tag (#) with valid JavaScript comment tags (//)
-        // 3. Request background vector matches to serve up context cards inline
         const searchRes = await axios.post('http://127.0.0.1:8000/snippets/search', { query: targetQuery });
         if (searchRes.data.status === 'success') {
           setSearchResults(searchRes.data.results);
@@ -367,31 +363,21 @@ function App() {
         {/* LEFT COLUMN: NATIVE 3D WEBGL CONTAINER PANEL */}
         <div className="w-1/2 h-[88vh] flex items-center justify-center relative bg-transparent overflow-hidden">
           <Canvas camera={{ position: [0, 1.2, 5.0], fov: 45 }}>
-            {/* UPGRADED STUDIO LIGHTING GRID RIG */}
-            {/* Ambient fills dark occlusion cracks evenly */}
             <ambientLight intensity={1.2} />
-            
-            {/* Main Key light illuminates true surface texture maps */}
             <directionalLight position={[10, 15, 10]} intensity={3.5} castShadow />
-            
-            {/* Fill light softens harsh vector shadows from the opposing side */}
             <directionalLight position={[-10, 10, 5]} intensity={1.5} />
-            
-            {/* Rim light pulls true contrast color contours off the pitch black background */}
             <directionalLight position={[0, 5, -10]} intensity={2.5} />
-            
-            {/* Direct spot highlight beams targeted straight at the model core */}
             <pointLight position={[0, 4, 2]} intensity={2.0} />
             
-            <Suspense fallback={null}>
+            <Suspense fallback={<Html center><span className="text-neutral-500 font-mono text-xs">Loading 3D Asset...</span></Html>}>
               <VaultModel />
             </Suspense>
             
             <OrbitControls 
-              enableZoom={true} 
+              enableZoom={false} 
               enablePan={false}
-              minDistance={2}
-              maxDistance={10}
+              minDistance={9}
+              maxDistance={9}
               makeDefault
             />
           </Canvas>
@@ -401,30 +387,34 @@ function App() {
         </div>
 
         {/* RIGHT COLUMN: CORE ASSISTANT CONSOLE HUB */}
-        <div className="w-1/2 flex flex-col items-center justify-center pr-4">
-          <div className="text-center mb-8 w-full">
-            <h1 className="text-5xl font-light tracking-tight text-white font-sans mb-3">
+        <div className="w-1/2 flex flex-col items-center justify-center pr-8 max-w-xl mx-auto">
+          
+          <div className="text-center mb-6 w-full">
+            {/* Toned down from text-7xl to text-6xl to keep it balanced and avoid pushing contents down */}
+            <h1 className="text-6xl font-light tracking-tight text-white font-sans mb-4">
               Bambi <span className="font-serif italic text-neutral-400">Vault</span>
             </h1>
-            <p className="font-serif italic text-sm text-neutral-300 max-w-md mx-auto leading-relaxed min-h-[48px] transition-all duration-300">
+            
+            {/* Balanced back down to text-base from text-lg to sit nicely in the gap */}
+            <p className="font-serif italic text-base text-neutral-300 max-w-xl mx-auto leading-relaxed min-h-[48px] transition-all duration-300 px-2">
               {bambiThinking}
             </p>
           </div>
 
           {/* Search/Query Interaction Row */}
-          <div className="w-full relative flex items-center mb-6 gap-3 max-w-md">
+          <div className="w-full relative flex items-center mb-6 gap-4 max-w-xl">
             <div className="relative flex-1 flex items-center">
               <input 
                 type="text" 
                 placeholder="Ask Bambi or select microphone to dictate query..."
-                className="w-full bg-white/[0.01] border border-white/10 text-white placeholder-neutral-700 px-6 py-5 pr-16 text-sm rounded-2xl focus:outline-none focus:border-white/25 focus:bg-white/[0.02] transition-all font-sans shadow-2xl"
+                className="w-full bg-white/[0.01] border border-white/10 text-white placeholder-neutral-700 px-6 py-5 pr-20 text-sm rounded-2xl focus:outline-none focus:border-white/25 focus:bg-white/[0.02] transition-all font-sans shadow-2xl"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && executeSearchPipeline()}
               />
               <button 
                 onClick={() => executeSearchPipeline()}
-                className="absolute right-3 bg-white text-black hover:bg-neutral-200 text-xs font-semibold px-4 py-2.5 rounded-xl active:scale-95 transition-transform"
+                className="absolute right-4 bg-white text-black hover:bg-neutral-200 text-xs font-semibold px-4 py-2.5 rounded-xl active:scale-95 transition-transform"
               >
                 Ask
               </button>
@@ -436,27 +426,27 @@ function App() {
                 isListening ? 'bg-rose-500 border-rose-400 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-pulse' : 'bg-white/5 border-white/10 text-neutral-400 hover:text-white'
               }`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 0 3-3v-6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" /></svg>
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 0 3-3v-6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z" /></svg>
             </button>
           </div>
 
           {/* CROPPED STICKER PREVIEW WINDOW */}
           {croppedImage && (
-            <div className="w-full max-w-xs bg-[#121216]/90 border border-white/10 p-4 rounded-2xl flex flex-col gap-3 shadow-2xl mb-6 animate-fade-in backdrop-blur-md">
-              <span className="font-mono text-[8px] text-neutral-500 uppercase tracking-widest">Isolated Region Sticker Clip Preview</span>
-              <div className="rounded-lg overflow-hidden border border-white/5 bg-black max-h-40 flex items-center justify-center">
-                <img src={croppedImage} alt="Crop Snippet" className="object-contain max-h-40 w-full" />
+            <div className="w-full max-w-sm bg-[#121216]/90 border border-white/10 p-5 rounded-2xl flex flex-col gap-4 shadow-2xl mb-6 animate-fade-in backdrop-blur-md">
+              <span className="font-mono text-[9px] text-neutral-500 uppercase tracking-widest">Isolated Region Sticker Clip Preview</span>
+              <div className="rounded-lg overflow-hidden border border-white/5 bg-black max-h-48 flex items-center justify-center">
+                <img src={croppedImage} alt="Crop Snippet" className="object-contain max-h-48 w-full" />
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => setCroppedImage(null)} className="flex-1 bg-white/5 hover:bg-white/10 text-white text-xs py-2 rounded-xl transition-all">Cancel</button>
-                <button onClick={sendStickerToBambi} className="flex-1 bg-white text-black font-semibold text-xs py-2 rounded-xl transition-all hover:bg-neutral-200">Send to Bambi</button>
+              <div className="flex gap-3">
+                <button onClick={() => setCroppedImage(null)} className="flex-1 bg-white/5 hover:bg-white/10 text-white text-xs py-2.5 rounded-xl transition-all">Cancel</button>
+                <button onClick={sendStickerToBambi} className="flex-1 bg-white text-black font-semibold text-xs py-2.5 rounded-xl transition-all hover:bg-neutral-200">Send to Bambi</button>
               </div>
             </div>
           )}
 
           {/* Semantic Matching Result Cards Dropdown */}
           {searchResults.length > 0 && (
-            <div className="w-full max-w-md space-y-4 max-h-[35vh] overflow-y-auto pr-2 animate-fade-in border-t border-white/5 pt-4 mt-2">
+            <div className="w-full max-w-xl space-y-4 max-h-[35vh] overflow-y-auto pr-2 animate-fade-in border-t border-white/5 pt-4 mt-2">
               <h3 className="font-mono text-[9px] tracking-widest text-neutral-500 uppercase px-1">Retrieved Ground Context Logs</h3>
               {searchResults.map((res, index) => (
                 <div key={index} className="p-4 bg-white/[0.01] border border-white/5 rounded-xl flex flex-col gap-3 hover:border-white/10 transition-colors">
